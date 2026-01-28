@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Senior Design Project</title>
+  <style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        line-height: 1.6;
+        background: linear-gradient(to bottom right, #dfe9f3, #ffffff);
+        /* soft gradient background */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    header {
+        background: rgba(105, 105, 105, 0.9);
+        color: #fff;
+        padding: 20px;
+        text-align: center;
+        width: 100%;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+    nav {
+        margin-top: 10px;
+    }
+    nav a {
+        color: #fff;
+        margin: 0 10px;
+        text-decoration: none;
+        font-weight: bold;
+        display: inline-block;
+    }
+    main {
+        padding: 20px;
+        max-width: 1200px; /* squeezes content into center */
+        width: 100%;
+    }
+    section {
+        padding: 20px;
+        margin: 20px 0;
+        background: #fff;
+        border-radius: 8px;
+    }
+    footer {
+        text-align: center;
+        padding: 15px;
+        background: rgba(105, 105, 105, 0.9);
+        color: #fff;
+        width: 100%;
+        margin-top: 40px;
+        box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    /* MOBILE RESPONSIVENESS */
+    @media (max-width: 600px) {
+        nav a {
+            display: block;
+            margin: 10px 0;
+        }
+        section {
+            margin: 10px 0;
+            padding: 15px;
+        }
+    }
+</style>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<header>
+  <h1>Senior Design: Odometry and Sensor Fusion</h1>
+  <nav>
+    <a href="../index.html">Home</a>
+  </nav>
+</header>
+
+<main>
+  <section>
+  <h2>Abstract</h2>
+  <div style="
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 30px;
+      justify-content: space-between;
+  ">
+    <!-- Left column (text) -->
+    <div style="flex: 1 1 400px; min-width: 280px;">
+      <p>
+        Tracking the position of a wheeled mobile robot is conceptually intuitive, but challenging 
+        to implement. Common issues include unpredictable wheel dynamics under varying slip conditions, 
+        drift in measurements taken in the robot’s body frame, and the high, dynamic variance of global 
+        reference sensors.
+      </p>
+      <p>
+        To address these problems, I implemented free spinning tracking wheels, a gyroscope, 
+        and a camera based GPS sensor that reads a barcode on robotics competition arena walls. 
+        The tracking wheels and gyroscope give accurate short term position estimates, while the 
+        GPS corrects drift as a global reference with higher variance.
+      </p>
+      <p>
+        I used an Extended Kalman Filter (EKF) as the state estimation framework, with a 
+        Jacobian Matrix to linearize the non-linear motion model. The prediction step runs 
+        at 100 Hz, using tracking wheels and a gyroscope to propagate the state based on 
+        measured changes in the robot's body frame. Since this prediction accumulates error 
+        over time, the GPS sensor performs a correction step at 10 Hz helping constrain long-term drift.
+      </p> 
+      <p>
+        Due to variability in GPS accuracy related to camera obstructions and motion blur, the 
+        measurement covariance R is adaptive to these conditions. A baseline covariance matrix 
+        was found from testing the GPS while the robot was stationary, and a heuristically 
+        determined constant multiple of the robot velocity was added to this. The camera based 
+        GPS also flagged obstructions to its image to increase uncertainty.
+      </p>
+    </div>
+
+    <!-- Right column (image) -->
+    <div style="flex: 1 1 400px; min-width: 280px; text-align: center;">
+      <img 
+        src="Testbot.jpg" 
+        alt="Test robot used for position tracking experiments" 
+        style="width: 100%; max-width: 480px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.15);"
+      >
+      <figcaption>
+        <strong>Figure 1:</strong> Test Robot for Tracking System Development
+      </figcaption>
+    </div>
+  </div>
+</section>
+  <section>
+    <section>
+      <h2>Introduction</h2>
+      <p>
+        With autonomous vehicles, drones, and industrial robots becoming common, the need for robust, 
+        accurate sensing systems has grown. Robots must not only perceive their environment, but also 
+        process, organize, and act upon sensor data in real time to achieve true autonomy.
+      </p>
+    
+      <p>
+        An example of this challenge is the design of robots for the <strong>VEX University Robotics 
+          Competition</strong>. Student teams compete under strict size, material, power, and component 
+          constraints to design robots that complete more scoring tasks than their opponents. These competitions 
+          begin with an autonomous portion, during which robots operate without driver input. Most teams rely on 
+          differential drive odometry (Figure 1) to track position. Standard VEX drive train libraries use motor 
+          encoder feedback to calculate position, but this assumes no wheel slip.
+      </p>
+    
+      <p>
+        A slightly more accurate approach uses free-spinning tracking wheels with encoders, configured to capture 
+        both forward and lateral displacement. When combined with a gyroscope, this system provides a more accurate 
+        short-term position estimate. The tracking wheel configuration (Figure 2) measures discrete displacement, 
+        allowing position estimation via numerical integration. However, without an external reference, errors from 
+        sensor noise and numerical integration accumulate unbounded over time. While this drift is often negligible in 
+        the 30-second autonomous period, it becomes significant for longer operation.
+      </p>
+
+      <div style="display: flex; justify-content: center; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin: 2rem 0;">
+  
+        <figure style="flex: 1; min-width: 280px; text-align: center;">
+          <img src="DDMR.jpg" alt="Differential Drive Odometry" style="width: auto; border-radius: 6px; max-height: 320px;">
+          <figcaption><strong>Figure 2.</strong> Differential Drive Model.</figcaption>
+        </figure>
+      
+        <figure style="flex: 1; min-width: 280px; text-align: center;">
+          <img src="SSMR.jpg" alt="Skid Steer or Tracking Wheel Odometry" style="width: auto; border-radius: 6px; max-height: 320px;">
+          <figcaption><strong>Figure 3.</strong> Tracking Wheel Odometry System.</figcaption>
+        </figure>
+      
+      </div>
+    
+      <p>
+        Despite the effectiveness of this odometry system, robotics competitions remain 
+        unpredictable-similar to real-world environments. For robust autonomous performance, a 
+        robot must correct its pose estimates using environmental feedback. I addressed this problem 
+        by combining odometry data with the VEX V5 GPS Sensor creating a more robust position 
+        tracking system. This sensor uses a camera to read barcode-like patterns on the Vex 
+        competition arena walls, combining frame data with readings from an internal IMU to estimate 
+        position at roughly 20 Hz. 
+      </p>
+    
+      <p>
+        More information about this sensor can be found on the 
+        <a href="https://kb.vex.com/hc/en-us/articles/360061932711-Using-the-GPS-Sensor-with-VEX-V5" target="_blank" rel="noopener noreferrer">
+          official VEX GPS documentation
+        </a>.
+      </p>
+    
+      <p>
+        While the V5 GPS is a creative solution to the drift problem, it has practical limitations. 
+        Its measurements exhibit high variance, similar to satellite GPS. This can be mitigated by 
+        fusing its estimates with more accurate short-term odometry data, though synchronizing these 
+        inputs at different refresh rates can be difficult. MATLAB Simulink’s hardware support for VEX 
+        V5 helped streamline deployment by generating C++ code directly from block diagrams.
+      </p>
+    </section>
+    <section>
+      <h2>Methods</h2>
+      <p>
+        The position tracking framework I developed integrates the V5 GPS and odometry systems using 
+        the Extended Kalman Filter (EKF). The Kalman Filter, introduced in Rudolf E. Kalman’s 1960 paper 
+        <em>A New Approach to Linear Filtering and Prediction Problems</em>, can be extended to nonlinear 
+        systems through linearization. It serves as an optimal state estimator for systems with Gaussian
+         process and measurement noise.
+      </p>
+    
+      <p>
+        The state vector for the robot’s pose (Eq. 1) includes its 2D position and orientation, while the 
+        input vector (Eq. 2) contains discrete changes in state derived from odometry. Although the Kalman 
+        Filter typically uses a system dynamics model with a control input vector in the prediction stage, 
+        the odometry measurements act as an equivalent—relating the previous state to the current one through 
+        motion estimates that accumulate unbounded error over time due to numerical integration.
+      </p>
+    
+      <figure>
+        <figcaption><strong>Equation 1.</strong> State vector</figcaption>
+        <img src="Equations/State_Vector.jpg" alt="State Vector Equation" style="display: block; margin: 0 auto; max-width: 60%;">
+      </figure>
+    
+      <figure>
+        <figcaption><strong>Equation 2.</strong> Input vector</figcaption>
+        <img src="Equations/Input_Vector.jpg" alt="Input Vector Equation" style="display: block; margin: 0 auto; max-width: 60%;">
+      </figure>
+    
+      <p>
+        Once initialized, the Kalman Filter alternates between prediction and update stages. 
+        In the prediction stage, the filter uses the previous estimate and current odometry inputs 
+        to predict the next state. For nonlinear motion (e.g., rotating body-frame measurements into 
+        a global frame), the prior estimate is computed as a nonlinear function of the previous state 
+        and odometry inputs (Eq. 3).
+      </p>
+    
+      <figure>
+        <figcaption><strong>Equation 3.</strong> Prior estimate</figcaption>
+        <img src="Equations/Prior_Estimate.jpg" alt="Prior Estimate Equation" style="display: block; margin: 0 auto; max-width: 60%;">
+      </figure>
+    
+      <p>
+        The covariance matrix for the prior estimate is found by applying the Jacobian of the motion 
+        model to the previous covariance, then adding process noise (Eq. 4). The Jacobian (Eq. 5) captures 
+        how small errors in the state grow or shrink as they pass through the nonlinear motion model.
+      </p>
+    
+      <figure>
+        <figcaption><strong>Equation 4.</strong> Prior covariance</figcaption>
+        <img src="Equations/Prior_Covariance.jpg" alt="Prior Covariance Equation" style="display: block; margin: 0 auto; max-width: 60%;">
+      </figure>
+    
+      <figure>
+        <figcaption><strong>Equation 5.</strong> Jacobian matrix</figcaption>
+        <img src="Equations/Jacobian.jpg" alt="Jacobian Equation" style="display: block; margin: 0 auto; max-width: 60%;">
+      </figure>
+    
+      <p>
+        During the update stage, the filter computes the <strong>posterior estimate</strong> (Eq. 6). 
+        The innovation is the difference between the measured and predicted (prior) state, and the posterior 
+        estimate is calculated by adding a weighted portion of this innovation to the prior estimate. The 
+        weighting depends on the relative uncertainty of the prior and measurement.
+      </p>
+    
+      <figure>
+        <figcaption><strong>Equation 6.</strong> Update stage</figcaption>
+        <img src="Equations/Update_Stage.jpg" alt="Update Stage Equation" style="display: block; margin: 0 auto; max-width: 60%;">
+      </figure>
+      <p>
+        Due to time constraints on this project, the covariance matrices used in the prediction and update stages were implemented as estimated placeholders. With additional time for testing, the variance of each individual sensor could have been measured and used to populate these matrices empirically. However, monitoring live sensor data showed that it was highly dependent on motion and environmental conditions. For example, the V5 GPS camera readings were affected by arena obstructions, motion blur during turns, and frame vibrations that excited the camera mounting pole, all of which increased measurement variance. As a result, controlled experiments such as driving in a straight line or performing a 90-degree turn would have produced covariance matrices that failed to capture this dynamic behavior.
+      </p>
+
+      <p>
+        Rather than dedicating limited time to tuning static covariance matrices, I developed heuristic adaptations that adjusted the measurement covariance R matrix under varying motion conditions. The filter began with a baseline diagonal matrix representing the minimum observed variances of the V5 GPS measurements (x, y, θ) under static, unobstructed conditions. This baseline assumed that sensor uncertainty could only increase during motion or blockage.
+      </p>
+
+      <ul>
+        <li><strong>Angular velocity term</strong> – a constant multiple of the low-passed magnitude of angular velocity, representing increased uncertainty from motion blur during turns.</li>
+        <li><strong>Linear acceleration term</strong> – a constant multiple of the low-passed magnitude of linear acceleration (from the IMU), representing vibrations within the frame and oscillations of the camera pole.</li>
+        <li><strong>Camera obstruction term</strong> – a growing variance applied when the GPS camera view was obstructed, resetting when the camera regained visibility.</li>
+      </ul>
+
+      <p>
+        The latter behavior was identified through experimentation, which revealed that the internal IMU of the V5 GPS sensor took over during visual occlusion, causing the reported uncertainty to grow unbounded until the camera view was restored. However, the built-in uncertainty values were not responsive to motion, only to obstructions, so they were not suitable replacements for the adaptive R matrix.
+      </p>
+
+      <p>
+        Low-passing the angular velocity and acceleration terms smoothed out abrupt sensor noise and produced gradual adaptations. This approach also reflected the real physical behavior of the system. Vibrations decayed over time following acceleration spikes, so a filtered signal naturally captured the rise and fall of uncertainty as the robot stabilized.
+      </p>
+
+      <p>
+        Flowcharts outlining the implementation (Figures 7 and 8) illustrate how the Kalman Filter operates using a small memory window that stores the previous output. While not every nuance is depicted, the diagrams convey the overall logic and flow of the system.
+      </p>
+        <figure style="flex: 1; min-width: 280px; text-align: center;">
+          <img src="Base_FC.jpg" alt="Base Flowchart" style="width: 100%; max-width: 1000px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <figcaption><strong>Figure 4.</strong> Base Level Flowchart</figcaption>
+        </figure>
+
+        <figure style="flex: 1; min-width: 280px; text-align: center;">
+          <img src="Filter_FC.jpg" alt="Adaptive Filter Flowchart" style="width: 100%; max-width: 1000px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <figcaption><strong>Figure 5.</strong> Customized Kalman Filter Flowchart</figcaption>
+        </figure>
+
+    </section>
+  </section>
+  <section>
+    <h2>Results</h2>
+    <p> 
+        Results from experimentation with the described sensor fusion framework show a tracking system that logs the robot's pose in real time. To demonstrate how this works,
+        data from a trial run is used to generate a 2D rendering of the robot driving around the Vex competition playing field. This is played next to a video of the data collection
+        to see how the robot tracks its position in real time.
+    </p>
+    <div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 30px;">
+
+    <!-- Video 1 -->
+    <figure style="max-width: 480px; width: 100%; text-align: center; margin: 0;">
+      <video 
+        style="width: 100%; height: 300px; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" 
+        autoplay 
+        loop 
+        muted 
+        playsinline
+      >
+        <source src="IMG_5690.mp4" type="video/mp4">
+      </video>
+      <figcaption>
+        <strong>Figure 6:</strong> Test Video of Robot Tracking
+      </figcaption>
+    </figure>
+
+    <!-- Video 2 -->
+    <figure style="max-width: 480px; width: 100%; text-align: center; margin: 0;">
+      <video 
+        style="width: 100%; height: 300px; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" 
+        autoplay 
+        loop 
+        muted 
+        playsinline
+      >
+        <source src="robot_animation.mp4" type="video/mp4">
+      </video>
+      <figcaption>
+        <strong>Figure 7:</strong> Robot Trajectory Render from Tracking System Data
+      </figcaption>
+    </figure>
+
+  </div>
+</section>
+<section>
+  <h2>Conclusion</h2>
+  <p>
+    Despite the challenges of designing and implementing an accurate position tracking system for a robotics competition, a working 
+    framework was developed unique to the problem. This builds a foundation for improvements with experimental tuning and 
+    additional sensors. With more data, the system could be further developed through analysis of sensor residuals. 
+    By categorizing GPS measurements between camera obstruction and non-obstruction events, motion-dependent covariance terms 
+    could be optimized independent of camera obstructions to better reflect the robot’s behavior. Furthermore, integrating more sensors, 
+    such as LIDAR for localization based on landmarks in the robotics competition arena would provide an additional update stage 
+    through an independent pose estimate improving robustness. Together, these approaches would create a robust system adaptive
+    to real-world variations founded upon experimental data and the framework developed.
+
+  </p>
+</section>
+</main>
+
+<footer>
+  Thanks for visiting!
+</footer>
+
+</body>
+</html>
